@@ -5,16 +5,28 @@ import ImageLinkForm from './components/ImageLinkForm/ImageLinkForm';
 import Rank from './components/Rank/Rank';
 import './App.css';
 import ParticlesBg from 'particles-bg';
-import Clarifai from 'clarifai';
 import FaceRecognition from './components/FaceRecognition/FaceRecognition'
 import SignIn from './components/SignIn/SignIn';
 import Register from './components/Register/Register';
 
 // console.log(Clarifai);
 
-const app = new Clarifai.App({
-  apiKey: 'd37936effb2c4579a90dc12a2daf243ae9bce8df45964982ab401a67dc52efd6'
- });
+
+
+const initialState = {
+      input: '',
+      imageUrl:'',
+      box: {},
+      route: 'signIn',
+      isSignedIn : false, 
+      user: {
+        id:'',
+        name: '',
+        email: '',
+        entries: 0,
+        joined: '',
+      }
+}
 
 class App extends Component {
   constructor() {
@@ -25,7 +37,25 @@ class App extends Component {
       box: {},
       route: 'signIn',
       isSignedIn : false, 
+      user: {
+        id:'',
+        name: '',
+        email: '',
+        entries: 0,
+        joined: '',
+      }
     }
+  }
+
+
+  loadUser = (data) => {
+    this.setState({user:{
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      entries: data.entries,
+      joined: data.joined,
+    }})
   }
 
   calculateFaceLocation = (data) => {
@@ -56,54 +86,39 @@ class App extends Component {
   onButtonSubmit = () =>{
     this.setState({imageUrl: this.state.input})
     // console.log('calling api');
-    const USER_ID = 'kahung33';
-    const PAT = '2a6d757f14714eb8a9b6a13b122574ea';
-    const APP_ID = 'brainrecog';
-    const MODEL_ID ='face-detection';
-    const MODEL_VERSION_ID='6dc7e46bc9124c5c8824be4822abe105';
-    const IMAGE_URL = this.state.input;
-    const raw = JSON.stringify({
-      "user_app_id": {
-          "user_id": USER_ID,
-          "app_id": APP_ID
-      },
-      "inputs": [
-          {
-              "data": {
-                  "image": {
-                      "url": IMAGE_URL
-                  }
-              }
-          }
-      ]
-  });
-
-  const requestOptions = {
-      method: 'POST',
-      headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Key ' + PAT
-      },
-      body: raw
-  };
-
-  // NOTE: MODEL_VERSION_ID is optional, you can also call prediction with the MODEL_ID only
-  // https://api.clarifai.com/v2/models/{YOUR_MODEL_ID}/outputs
-  // this will default to the latest version_id
-
-  fetch("https://api.clarifai.com/v2/models/" + MODEL_ID + "/versions/" + MODEL_VERSION_ID + "/outputs", requestOptions)
-    //cast the response to Javascript Obejct
-      .then(response => response.json())
+    fetch(' https://salty-caverns-71107.herokuapp.com/imageurl',{
+      method : 'post',
+      headers : {'Content-Type' : 'application/json'},
+      body : JSON.stringify({
+        input : this.state.input,
+      })
+    }).then(response => response.json())
       .then(result => {
+        if (result) {
+          fetch(' https://salty-caverns-71107.herokuapp.com/image',{
+            method : 'put',
+            headers : {'Content-Type' : 'application/json'},
+            body : JSON.stringify({
+              id : this.state.user.id,
+            })
+          })
+          .then(response => response.json())
+          //might add .catch after each .then statement
+          .then(count => {
+            this.setState(Object.assign(this.state.user, {entries: count}))
+          })
+          
+        }
         // //use this to check how to get the bounding box
         // console.log('result:', result);
         this.displayFaceBox(this.calculateFaceLocation(result));
-      }).catch(error => console.log('error', error));
+      })
+      .catch(error => console.log('error', error));
   }
 
   onRouteChange = (route) => {
     if (route === 'signIn'){
-      this.setState({isSignedIn: false})
+      this.setState(initialState)
     } else if (route === 'home'){
       this.setState({isSignedIn: true})
     }
@@ -119,7 +134,7 @@ class App extends Component {
         { route === 'home' 
           ?<div>
           <Logo />
-          <Rank />
+          <Rank user = {this.state.user}/>
           <ImageLinkForm 
           onInputChange = {this.onInputChange} 
           onButtonSubmit = {this.onButtonSubmit}/>
@@ -127,8 +142,8 @@ class App extends Component {
           </div>
           : (
             route === 'signIn' ?
-            <SignIn onRouteChange={this.onRouteChange}/> 
-            : <Register onRouteChange={this.onRouteChange}/>
+            <SignIn onRouteChange={this.onRouteChange} loadUser = {this.loadUser}/> 
+            : <Register onRouteChange={this.onRouteChange} loadUser={this.loadUser}/>
           )
         }
         
